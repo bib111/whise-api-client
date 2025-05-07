@@ -1,0 +1,127 @@
+/**
+ * Contact creation example
+ * Shows how to create/update contacts and add search criteria
+ */
+require('dotenv').config();
+const WhiseClient = require('../src');
+
+// Get credentials from environment variables
+const credentials = {
+  username: process.env.WHISE_USERNAME,
+  password: process.env.WHISE_PASSWORD
+};
+
+// Initialize the client
+const whise = new WhiseClient(credentials);
+
+// Client and office IDs (replace with your values)
+const CLIENT_ID = process.env.WHISE_CLIENT_ID;
+const OFFICE_ID = process.env.WHISE_OFFICE_ID;
+
+async function runContactsExample() {
+  try {
+    // Set client
+    await whise.setClient(CLIENT_ID, OFFICE_ID);
+    console.log('Client authentication successful!');
+
+    // Get contact origins
+    console.log('\nGetting contact origins...');
+    const originsResponse = await whise.contacts.getOrigins();
+    
+    if (originsResponse.ContactOrigins && originsResponse.ContactOrigins.length > 0) {
+      console.log(`Found ${originsResponse.TotalCount} contact origins`);
+      // Use the first contact origin
+      const firstOrigin = originsResponse.ContactOrigins[0];
+      console.log(`Using origin: ${firstOrigin.name} (ID: ${firstOrigin.id})`);
+      
+      // Create a new contact
+      console.log('\nCreating a new contact...');
+      
+      // Contact data
+      const contactData = {
+        Name: 'Doe',
+        FirstName: 'John',
+        PrivateEmail: `john.doe.${Date.now()}@example.com`, // Use timestamp to make unique
+        PrivateTel: '+32 123 456 789',
+        CountryId: 1, // Belgium
+        LanguageId: 'en-GB',
+        OfficeIds: [parseInt(OFFICE_ID)],
+        ContactOriginId: firstOrigin.id,
+        AgreementEmail: true,
+        Comments: 'Created via Whise API Client example'
+      };
+      
+      // Create the contact
+      const createResponse = await whise.contacts.create(contactData);
+      
+      if (createResponse && createResponse.ContactId) {
+        console.log(`Contact created successfully with ID: ${createResponse.ContactId}`);
+        
+        // Create a duplicate contact to demonstrate upsert
+        console.log('\nCreating a duplicate contact with upsert...');
+        
+        // Update some fields
+        const updatedContactData = {
+          ...contactData,
+          Comments: 'Updated via Whise API Client example'
+        };
+        
+        // Upsert the contact
+        const upsertResponse = await whise.contacts.upsert(updatedContactData);
+        
+        if (upsertResponse && upsertResponse.ContactId) {
+          console.log(`Contact upserted successfully with ID: ${upsertResponse.ContactId}`);
+          console.log(`Note: If the ID is the same as before (${createResponse.ContactId}), the contact was updated rather than created.`);
+        }
+        
+        // Create a contact with search criteria
+        console.log('\nCreating a contact with search criteria...');
+        
+        // Define search criteria (for a 2-bedroom apartment in Belgium)
+        const searchCriteria = [{
+          PurposeId: 1, // For sale
+          CategoryId: 1, // Residential
+          SubcategoryId: 2, // Apartment
+          PriceMax: 300000,
+          PriceMin: 100000,
+          AreaMin: 70,
+          CountryId: 1, // Belgium
+          MinRooms: 2,
+          Garage: true,
+          Terrace: true
+        }];
+        
+        // New contact data with search criteria
+        const contactWithSearchData = {
+          Name: 'Smith',
+          FirstName: 'Jane',
+          PrivateEmail: `jane.smith.${Date.now()}@example.com`, // Use timestamp to make unique
+          PrivateTel: '+32 987 654 321',
+          CountryId: 1, // Belgium
+          LanguageId: 'en-GB',
+          OfficeIds: [parseInt(OFFICE_ID)],
+          ContactOriginId: firstOrigin.id,
+          AgreementEmail: true,
+          Comments: 'Created with search criteria via Whise API Client example',
+          SearchCriteria: searchCriteria
+        };
+        
+        // Create the contact with search criteria
+        const searchContactResponse = await whise.contacts.createWithSearchCriteria(
+          contactWithSearchData, 
+          searchCriteria
+        );
+        
+        if (searchContactResponse && searchContactResponse.ContactId) {
+          console.log(`Contact with search criteria created successfully with ID: ${searchContactResponse.ContactId}`);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+
+// Run the example
+runContactsExample().catch(console.error);

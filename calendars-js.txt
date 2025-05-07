@@ -1,0 +1,181 @@
+/**
+ * Calendars API module
+ */
+const axios = require('axios');
+const { DEFAULT_BASE_URL } = require('../utils/constants');
+
+class Calendars {
+  /**
+   * @param {Object} auth - Auth instance
+   */
+  constructor(auth) {
+    this.auth = auth;
+    this.baseUrl = auth.config.baseUrl || DEFAULT_BASE_URL;
+  }
+
+  /**
+   * Get calendars list
+   * @param {Object} options - Query options
+   * @param {Object} [options.Filter] - Filter options
+   * @param {Object} [options.Page] - Pagination options
+   * @param {Array} [options.Sort] - Sort options
+   * @param {Object} [options.Field] - Field inclusion/exclusion
+   * @returns {Promise<Object>} Calendars response
+   */
+  async list(options = {}) {
+    const headers = await this.auth.getClientHeaders();
+    
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/v1/calendars/list`,
+        options,
+        { headers }
+      );
+      
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'Error fetching calendars');
+    }
+  }
+
+  /**
+   * Get calendar actions list
+   * @param {string} [languageId] - Language ID
+   * @returns {Promise<Object>} Calendar actions response
+   */
+  async getActions(languageId = null) {
+    const headers = await this.auth.getClientHeaders();
+    
+    const payload = languageId ? { LanguageId: languageId } : {};
+    
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/v1/calendars/actions/list`,
+        payload,
+        { headers }
+      );
+      
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'Error fetching calendar actions');
+    }
+  }
+
+  /**
+   * Delete calendars
+   * @param {Array<number>} calendarIds - Calendar IDs to delete
+   * @param {Object} [dateTimeRange] - Optional date/time range
+   * @returns {Promise<Object>} Delete response
+   */
+  async delete(calendarIds, dateTimeRange = null) {
+    if (!calendarIds || !calendarIds.length) {
+      throw new Error('At least one Calendar ID is required');
+    }
+
+    const headers = await this.auth.getClientHeaders();
+    
+    const payload = {
+      CalendarIds: calendarIds
+    };
+    
+    if (dateTimeRange) {
+      payload.DateTimeRange = dateTimeRange;
+    }
+    
+    try {
+      const response = await axios.delete(
+        `${this.baseUrl}/v1/calendars/delete`,
+        { 
+          headers,
+          data: payload
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'Error deleting calendars');
+    }
+  }
+
+  /**
+   * Update a calendar (add contact to appointment)
+   * @param {number} calendarId - Calendar ID
+   * @param {number} contactId - Contact ID
+   * @returns {Promise<Object>} Update response
+   */
+  async update(calendarId, contactId) {
+    if (!calendarId) throw new Error('Calendar ID is required');
+    if (!contactId) throw new Error('Contact ID is required');
+
+    const headers = await this.auth.getClientHeaders();
+    
+    try {
+      const response = await axios.patch(
+        `${this.baseUrl}/v1/calendars/update`,
+        {
+          CalendarId: calendarId,
+          ContactId: contactId
+        },
+        { headers }
+      );
+      
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'Error updating calendar');
+    }
+  }
+
+  /**
+   * Create or update a calendar appointment
+   * @param {Object} calendar - Calendar data
+   * @param {number} calendar.CalendarActionId - Calendar action ID (required)
+   * @param {string} calendar.StartDateTime - Start date/time (required)
+   * @param {string} calendar.EndDateTime - End date/time (required)
+   * @param {string} calendar.Subject - Subject (required)
+   * @param {Array<number>} calendar.UserIds - User IDs (required)
+   * @param {Array<number>} [calendar.EstateIds] - Estate IDs
+   * @param {Array<number>} [calendar.ContactIds] - Contact IDs
+   * @returns {Promise<Object>} Calendar upsert response
+   */
+  async upsert(calendar) {
+    if (!calendar.CalendarActionId) throw new Error('Calendar action ID is required');
+    if (!calendar.StartDateTime) throw new Error('Start date/time is required');
+    if (!calendar.EndDateTime) throw new Error('End date/time is required');
+    if (!calendar.Subject) throw new Error('Subject is required');
+    if (!calendar.UserIds || !calendar.UserIds.length) {
+      throw new Error('At least one User ID is required');
+    }
+
+    const headers = await this.auth.getClientHeaders();
+    
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/v1/calendars/upsert`,
+        calendar,
+        { headers }
+      );
+      
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'Error upserting calendar');
+    }
+  }
+
+  /**
+   * Handle API errors
+   * @private
+   * @param {Error} error - The error object
+   * @param {string} defaultMessage - Default error message
+   * @throws {Error} Enhanced error
+   */
+  _handleError(error, defaultMessage) {
+    if (error.response) {
+      const { status, data } = error.response;
+      const message = data?.message || defaultMessage;
+      throw new Error(`${message} (${status}): ${JSON.stringify(data)}`);
+    }
+    throw error;
+  }
+}
+
+module.exports = Calendars;
